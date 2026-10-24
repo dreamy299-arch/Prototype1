@@ -24,29 +24,29 @@ public class FPController : MonoBehaviour
     public float crouchSpeed = 2.5f; 
     private float originalMoveSpeed; 
 
+    [Header("Sprint Setting")]
+    public float sprintSpeed = 8.3f;
+    public int num = 34;
+
     [Header("Pickup Settings")] 
     public float pickupRange = 3f; 
     public Transform holdPoint; 
-    // FIXED: Corrected typo 'heldObect' to 'heldObject'
     public PickUpObject heldObject; 
 
     [Header("Throw Settings")] 
     public float throwForce = 10f; 
     public float throwUpwardBoost = 1f; 
 
-    private CharacterController controller; 
-    // FIXED: Added the missing Rigidbody variable reference
+    public CharacterController controller; 
     private Rigidbody rb; 
-    private Vector2 moveInput; 
+    public Vector2 moveInput; 
     private Vector2 lookInput; 
     private Vector3 velocity; 
     private float verticalRotation = 0f; 
 
-    // Awake runs once when the GameObject is first loaded. 
     private void Awake() 
     { 
         controller = GetComponent<CharacterController>(); 
-        // FIXED: Cache the Rigidbody component on startup
         rb = GetComponent<Rigidbody>(); 
         originalMoveSpeed = moveSpeed; 
         Cursor.lockState = CursorLockMode.Locked; 
@@ -55,13 +55,17 @@ public class FPController : MonoBehaviour
 
     private void Update() 
     { 
-        HandleMovement(); 
-        HandleLook(); 
-        // FIXED: Standardized to 'heldObject' spelling
-        if(heldObject != null) 
-        { 
-            heldObject.MoveToHoldPoint(holdPoint.position); 
-        } 
+        // Only run movement and rotation when the game is NOT paused
+        if (!PauseManuScript.isPaused)
+        {
+            HandleMovement(); 
+            HandleLook(); 
+
+            if (heldObject != null) 
+            { 
+                heldObject.MoveToHoldPoint(holdPoint.position); 
+            } 
+        }
     } 
 
     public void OnMove(InputAction.CallbackContext context) 
@@ -69,10 +73,14 @@ public class FPController : MonoBehaviour
         moveInput = context.ReadValue<Vector2>(); 
     } 
 
+    public void OnLook(InputAction.CallbackContext context) 
+    { 
+        lookInput = context.ReadValue<Vector2>(); 
+    } 
+
     public void Throw(Vector3 impulse) 
     { 
         transform.SetParent(null); 
-        // FIXED: The script now recognizes 'rb'
         if (rb != null)
         {
             rb.useGravity = true; 
@@ -80,11 +88,6 @@ public class FPController : MonoBehaviour
             rb.angularVelocity = Vector3.zero; 
             rb.AddForce(impulse, ForceMode.Impulse); 
         }
-    } 
-
-    public void OnLook(InputAction.CallbackContext context) 
-    { 
-        lookInput = context.ReadValue<Vector2>(); 
     } 
 
     public void HandleMovement() 
@@ -123,6 +126,9 @@ public class FPController : MonoBehaviour
 
     public void OnShoot(InputAction.CallbackContext context) 
     { 
+        // Ignore input actions while paused
+        if (PauseManuScript.isPaused) return;
+
         if (context.performed) 
         { 
             Shoot(); 
@@ -144,6 +150,8 @@ public class FPController : MonoBehaviour
 
     public void OnCrouch(InputAction.CallbackContext context) 
     { 
+        if (PauseManuScript.isPaused) return;
+
         if (context.performed) 
         { 
             controller.height = crouchHeight; 
@@ -158,9 +166,8 @@ public class FPController : MonoBehaviour
 
     public void OnPickUp(InputAction.CallbackContext context) 
     { 
-        if (!context.performed) return; 
+        if (PauseManuScript.isPaused || !context.performed) return; 
 
-        // FIXED: Standardized spelling
         if (heldObject == null) 
         { 
             Ray ray = new Ray(cameraTransform.position, cameraTransform.forward); 
@@ -183,7 +190,7 @@ public class FPController : MonoBehaviour
 
     public void OnThrow(InputAction.CallbackContext context) 
     { 
-        if (!context.performed) return; 
+        if (PauseManuScript.isPaused || !context.performed) return; 
         if (heldObject == null) return; 
 
         Vector3 dir = cameraTransform.forward; 
@@ -192,4 +199,3 @@ public class FPController : MonoBehaviour
         heldObject = null; 
     } 
 }
-
