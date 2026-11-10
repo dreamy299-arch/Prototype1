@@ -198,4 +198,20 @@ public class FPController : MonoBehaviour
         heldObject.Throw(impulse); 
         heldObject = null; 
     } 
+
+    
+    public void ToggleCursor(bool isEnabled)
+    {
+        if (isEnabled)
+        {
+          Cursor.lockState = CursorLockMode.None;
+          Cursor.visible = true;
+        }
+        else
+        {
+          Cursor.lockState = CursorLockMode.Locked;
+          Cursor.visible = false;
+        } 
+    }
+    
 }
