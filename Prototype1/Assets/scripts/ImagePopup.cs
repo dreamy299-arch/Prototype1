@@ -2,14 +2,14 @@ using UnityEngine;
 
 public class ImagePopup : MonoBehaviour
 {
-    public GameObject popupImageObject; // Drag your TutorialPopupImage here
+    public GameObject popupPanel; // The panel holding the background image and text
 
     public void TogglePopup()
     {
-        if (popupImageObject != null)
+        if (popupPanel != null)
         {
-            bool isActive = popupImageObject.activeSelf;
-            popupImageObject.SetActive(!isActive);
+            bool isActive = popupPanel.activeSelf;
+            popupPanel.SetActive(!isActive);
         }
     }
 }
