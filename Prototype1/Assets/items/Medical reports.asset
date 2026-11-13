@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 58ffa37cf811fdc418de9ec9b9760ae9, type: 3}
-  m_Name: policeReport
+  m_Name: Medical reports
   m_EditorClassIdentifier: Assembly-CSharp::ItemSO
-  itemName: Police Report
-  icon: {fileID: 0}
+  itemName: MedicalNotes
+  icon: {fileID: 21300000, guid: bbd3225097587884789d2e26be96b310, type: 3}
   maxStackSize: 1
-  itemPrefab: {fileID: 0}
-  handItemPrefab: {fileID: 0}
+  itemPrefab: {fileID: -6548781256075676299, guid: 104e659624bcded4f85c840030198cec, type: 3}
+  handItemPrefab: {fileID: -6548781256075676299, guid: 104e659624bcded4f85c840030198cec, type: 3}

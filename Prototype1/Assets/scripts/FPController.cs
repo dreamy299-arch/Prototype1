@@ -36,6 +36,12 @@ public class FPController : MonoBehaviour
     [Header("Throw Settings")] 
     public float throwForce = 10f; 
     public float throwUpwardBoost = 1f; 
+    
+    [Header("Animation")]
+    public Animator animator;
+
+    [Header("Inventory Status")]
+    public bool isInventoryOpen = false;
 
     public CharacterController controller; 
     private Rigidbody rb; 
@@ -54,9 +60,24 @@ public class FPController : MonoBehaviour
     } 
 
     private void Update() 
-    { 
-        // Only run movement and rotation when the game is NOT paused
-        if (!PauseManuScript.isPaused)
+    {
+        // Press 'I' to toggle the inventory grid cleanly
+        if (Keyboard.current != null && Keyboard.current.iKey.wasPressedThisFrame)
+        {
+            if (JournalManager.Instance != null)
+            {
+                JournalManager.Instance.ToggleInventory();
+                
+                // Sync the local state flag with the container's active status
+                if (JournalManager.Instance.inventoryContainer != null)
+                {
+                    isInventoryOpen = JournalManager.Instance.inventoryContainer.gameObject.activeSelf;
+                }
+            }
+        }
+
+        // Only run movement and rotation when the game is NOT paused and inventory is closed
+        if (!PauseManuScript.isPaused && !isInventoryOpen)
         {
             HandleMovement(); 
             HandleLook(); 
@@ -66,6 +87,18 @@ public class FPController : MonoBehaviour
                 heldObject.MoveToHoldPoint(holdPoint.position); 
             } 
         }
+
+        if (!PauseManuScript.isPaused && !isInventoryOpen)
+{
+    HandleMovement(); 
+    HandleLook(); 
+
+    if (animator != null)
+    {
+        bool isMoving = moveInput.magnitude > 0.1f && controller.isGrounded;
+        animator.SetBool("IsWalking", isMoving);
+    }
+}
     } 
 
     public void OnMove(InputAction.CallbackContext context) 
@@ -126,8 +159,7 @@ public class FPController : MonoBehaviour
 
     public void OnShoot(InputAction.CallbackContext context) 
     { 
-        // Ignore input actions while paused
-        if (PauseManuScript.isPaused) return;
+        if (PauseManuScript.isPaused || isInventoryOpen) return;
 
         if (context.performed) 
         { 
@@ -150,7 +182,7 @@ public class FPController : MonoBehaviour
 
     public void OnCrouch(InputAction.CallbackContext context) 
     { 
-        if (PauseManuScript.isPaused) return;
+        if (PauseManuScript.isPaused || isInventoryOpen) return;
 
         if (context.performed) 
         { 
@@ -166,22 +198,37 @@ public class FPController : MonoBehaviour
 
     public void OnPickUp(InputAction.CallbackContext context) 
     { 
-        if (PauseManuScript.isPaused || !context.performed) return; 
+        if (PauseManuScript.isPaused || isInventoryOpen || !context.performed) return; 
 
-        if (heldObject == null) 
+        Ray ray = new Ray(cameraTransform.position, cameraTransform.forward); 
+        if (Physics.Raycast(ray, out RaycastHit hit, pickupRange)) 
         { 
-            Ray ray = new Ray(cameraTransform.position, cameraTransform.forward); 
-            if (Physics.Raycast(ray, out RaycastHit hit, pickupRange)) 
+            JournalItem journal = hit.collider.GetComponent<JournalItem>();
+            if (journal != null)
+            {
+                if (JournalManager.Instance != null)
+                {
+                    JournalManager.Instance.CollectAndOpenJournal(journal.journalText);
+                }
+                Destroy(hit.collider.gameObject); 
+                return;
+            }
+
+            PickUpObject pickUp = hit.collider.GetComponent<PickUpObject>(); 
+            if (pickUp != null) 
             { 
-                PickUpObject pickUp = hit.collider.GetComponent<PickUpObject>(); 
-                if (pickUp != null) 
-                { 
-                    pickUp.PickUp(holdPoint); 
-                    heldObject = pickUp; 
-                } 
+                pickUp.PickUp(holdPoint); 
+                return; 
             } 
+
+            DoorController door = hit.collider.GetComponent<DoorController>();
+            if (door != null)
+            {
+                door.Interact();
+                return;
+            }
         } 
-        else 
+        else if (heldObject != null) 
         { 
             heldObject.Drop(); 
             heldObject = null; 
@@ -190,7 +237,7 @@ public class FPController : MonoBehaviour
 
     public void OnThrow(InputAction.CallbackContext context) 
     { 
-        if (PauseManuScript.isPaused || !context.performed) return; 
+        if (PauseManuScript.isPaused || isInventoryOpen || !context.performed) return; 
         if (heldObject == null) return; 
 
         Vector3 dir = cameraTransform.forward; 
@@ -199,19 +246,17 @@ public class FPController : MonoBehaviour
         heldObject = null; 
     } 
 
-    
     public void ToggleCursor(bool isEnabled)
     {
         if (isEnabled)
         {
-          Cursor.lockState = CursorLockMode.None;
-          Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
         else
         {
-          Cursor.lockState = CursorLockMode.Locked;
-          Cursor.visible = false;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         } 
     }
-    
 }

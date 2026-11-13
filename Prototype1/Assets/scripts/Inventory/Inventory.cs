@@ -3,209 +3,226 @@ using UnityEngine.InputSystem;
 using System.Collections.Generic;
 using UnityEngine.UI;
 
-
 public class Inventory : MonoBehaviour
 {
+    public FPController playerController;
 
-   public ItemSO policeReportItem;
-   public ItemSO letterItem;
+    public GameObject inventoryPanel; // Assign your UI panel here
 
-   public FPController playerController;
+    public GameObject hotBarObject;
+    public GameObject InventorySlotParent;
 
-   public GameObject inventoryPanel; // Assign your UI panel here
+    public Image dragIcon;
 
-   public GameObject hotBarObject;
-   public GameObject InventorySlotParent;
+    private List<Slot> inventorySlots = new List<Slot>();
+    private List<Slot> hotBarSlots = new List<Slot>();
+    private List<Slot> allSlots = new List<Slot>();
 
-   public Image dragIcon;
+    private Slot dragSlot = null;
+    private bool isDragging = false;
 
-   private List<Slot> inventorySlots = new List<Slot>();
-   private List<Slot> hotBarSlots = new List<Slot>();
-   private List<Slot> allSlots = new List<Slot>();
-
-   private Slot dragSlot = null;
-   private bool isDragging = false;
-
-   private void Awake()
-   {
-    inventorySlots.AddRange(InventorySlotParent.GetComponentsInChildren<Slot>());
-    hotBarSlots.AddRange(hotBarObject.GetComponentsInChildren<Slot>());
-
-    allSlots.AddRange(inventorySlots);
-    allSlots.AddRange(hotBarSlots);
-   } 
-   
-   void Update()
+    private void Awake()
     {
-       if (Keyboard.current != null)
+        inventorySlots.AddRange(InventorySlotParent.GetComponentsInChildren<Slot>());
+        hotBarSlots.AddRange(hotBarObject.GetComponentsInChildren<Slot>());
+
+        allSlots.AddRange(inventorySlots);
+        allSlots.AddRange(hotBarSlots);
+    } 
+    
+    void Update()
+    {
+        // Always listen for the 'I' key to toggle inventory open/closed
+        if (Keyboard.current != null && Keyboard.current.iKey.wasPressedThisFrame)
         {
-            if (Keyboard.current.eKey.wasPressedThisFrame)
-            {
-                AddItem(letterItem, 1);
-            } 
-            else if (Keyboard.current.rKey.wasPressedThisFrame)
-            {
-                AddItem(policeReportItem, 1);
-            }
+            ToggleInventory();
         }
 
-        StartDrag();
-        UpdateDragItemPosition();
-        EndDrag();
+        // Only process dragging when the inventory panel is open
+        if (inventoryPanel != null && inventoryPanel.activeSelf)
+        {
+            StartDrag();
+            UpdateDragItemPosition();
+            EndDrag();
+        }
     }
 
    public void ToggleInventory()
-   {
-     // Toggle the panel visibility
-     bool isActive = !inventoryPanel.activeSelf;
-     inventoryPanel.SetActive(isActive);
+{
+    if (inventoryPanel == null) return;
 
-     // This is where you put the line!
-     playerController.ToggleCursor(isActive);
-     if (playerController != null)
-     {
-       playerController.ToggleCursor(isActive);
-     }
-   }
+    // Force the opposite state explicitly
+    bool shouldBeActive = !inventoryPanel.activeSelf;
+    inventoryPanel.SetActive(shouldBeActive);
 
-   public void AddItem(ItemSO itemToAdd, int amount)
-   {
-    int remaining = amount;
-
-    foreach(Slot slot in allSlots)
+    // Tell the FPController to update cursor visibility and lock state
+    if (playerController != null)
     {
-        if(slot.HasItem() && slot.GetItem() == itemToAdd)
+        playerController.ToggleCursor(shouldBeActive);
+    }
+}
+
+    public void AddItem(ItemSO itemToAdd, int amount)
+    {
+        int remaining = amount;
+
+        foreach(Slot slot in allSlots)
         {
-            int currentAmount = slot.GetAmount();
-            int maxStack = itemToAdd.maxStackSize;
-
-            if(currentAmount < maxStack)
+            if(slot.HasItem() && slot.GetItem() == itemToAdd)
             {
-                int spaceLeft = maxStack - currentAmount;
-                int amountToAdd = Mathf.Min(spaceLeft, remaining);
+                int currentAmount = slot.GetAmount();
+                int maxStack = itemToAdd.maxStackSize;
 
-                slot.SetItem(itemToAdd, currentAmount + amountToAdd);
-                remaining -= amountToAdd;
+                if(currentAmount < maxStack)
+                {
+                    int spaceLeft = maxStack - currentAmount;
+                    int amountToAdd = Mathf.Min(spaceLeft, remaining);
 
+                    slot.SetItem(itemToAdd, currentAmount + amountToAdd);
+                    remaining -= amountToAdd;
+
+                    if(remaining <= 0)
+                    return;
+                }
+            }
+        }
+
+        foreach(Slot slot in allSlots)
+        {
+            if(!slot.HasItem())
+            {
+                int amountToPlace = Mathf.Min(itemToAdd.maxStackSize, remaining);
+                slot.SetItem(itemToAdd, amountToPlace);
+                remaining -= amountToPlace;
                 if(remaining <= 0)
                 return;
             }
         }
-    }
 
-    foreach(Slot slot in allSlots)
-    {
-        if(!slot.HasItem())
+        if(remaining > 0)
         {
-            int amountToPlace = Mathf.Min(itemToAdd.maxStackSize, remaining);
-            slot.SetItem(itemToAdd, amountToPlace);
-            remaining -= amountToPlace;
-            if(remaining <= 0)
-            return;
+            Debug.Log("Inventory is full, could not add " + remaining + " of " + itemToAdd.itemName);
         }
     }
 
-    if(remaining >0)
+    private void StartDrag()
     {
-        Debug.Log("Inventory is full, could not add" + remaining + "of" + itemToAdd.itemName);
-    }
-   }
-
-   private void StartDrag()
-   {
-    if(Input.GetMouseButtonDown(0))
-    {
-        Slot hovered = GetHoveredSlot();
-
-        if(hovered != null && hovered.HasItem())
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
         {
-            dragSlot = hovered;
-            isDragging = true;
+            Slot hovered = GetHoveredSlot();
 
-            //Show drag item
-            dragIcon.sprite = hovered.GetItem().icon;
-            dragIcon.color = new Color(1, 1, 0.5f);
-            dragIcon.enabled = true;
+            if(hovered != null && hovered.HasItem())
+            {
+                dragSlot = hovered;
+                isDragging = true;
+
+                // Show drag item
+                dragIcon.sprite = hovered.GetItem().icon;
+                dragIcon.color = new Color(1, 1, 0.5f);
+                dragIcon.enabled = true;
+            }
         }
     }
-   }
 
-   private void EndDrag()
-   {
-    if(Input.GetMouseButtonUp(0) && isDragging)
+    private void EndDrag()
     {
-      Slot hovered = GetHoveredSlot();
+        if (Mouse.current != null && (Mouse.current.leftButton.wasReleasedThisFrame || !Mouse.current.leftButton.isPressed) && isDragging)
+        {
+            Slot hovered = GetHoveredSlot();
 
-      if(hovered != null)
-      {
-        HandleDrop(dragSlot, hovered);
+            if(hovered != null)
+            {
+                HandleDrop(dragSlot, hovered);
+            }
 
-        dragIcon.enabled = false;
-        
-        dragSlot = null;
-        isDragging = false;
-      }
+            if (dragIcon != null)
+            {
+                dragIcon.enabled = false;
+            }
+            
+            dragSlot = null;
+            isDragging = false;
+        }
     }
-   }
 
-   private Slot GetHoveredSlot()
-   {
-     foreach(Slot s in allSlots)
-     {
-        if(s.hovering)
-            return s;
-     }
+    private Slot GetHoveredSlot()
+    {
+        if (UnityEngine.EventSystems.EventSystem.current != null)
+        {
+            var pointerEventData = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current);
+            pointerEventData.position = Mouse.current.position.ReadValue();
 
-     return null;
-   }
+            var results = new System.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult>();
+            UnityEngine.EventSystems.EventSystem.current.RaycastAll(pointerEventData, results);
 
-   private void HandleDrop(Slot from, Slot to)
-   {
-     if(from == to) return;
+            foreach (var result in results)
+            {
+                Slot slot = result.gameObject.GetComponentInParent<Slot>();
+                if (slot != null && allSlots.Contains(slot))
+                {
+                    return slot;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private void HandleDrop(Slot from, Slot to)
+    {
+        if(from == to) return;
     
-    //Stacking
-     if(to.HasItem() && to.GetItem() == from.GetItem())
-     {
-        int max = to.GetItem().maxStackSize;
-        int space = max - to.GetAmount();
-
-        if(space > 0)
+        // Stacking
+        if(to.HasItem() && to.GetItem() == from.GetItem())
         {
-            int move = Mathf.Min(space, from.GetAmount());
+            int max = to.GetItem().maxStackSize;
+            int space = max - to.GetAmount();
 
-            to.SetItem(to.GetItem(), to.GetAmount() + move);
-            from.SetItem(from.GetItem(), from.GetAmount() - move);
+            if(space > 0)
+            {
+                int move = Mathf.Min(space, from.GetAmount());
 
-            if(from.GetAmount() <= 0)
-                from.ClearSlot();
+                to.SetItem(to.GetItem(), to.GetAmount() + move);
+                from.SetItem(from.GetItem(), from.GetAmount() - move);
+
+                if(from.GetAmount() <= 0)
+                    from.ClearSlot();
 
                 return;
+            }
+        } 
+
+        // Different item
+        if(to.HasItem())
+        {
+            ItemSO tempItem = to.GetItem();
+            int tempAmount = to.GetAmount();
+
+            to.SetItem(from.GetItem(), from.GetAmount());
+            from.SetItem(tempItem, tempAmount);
+            return;
         }
-     } 
 
-     //Different item
-     if(to.HasItem())
-     {
-        ItemSO tempItem = to.GetItem();
-        int tempAmount = to.GetAmount();
-
+        // Empty slot
         to.SetItem(from.GetItem(), from.GetAmount());
-        from.SetItem(tempItem, tempAmount);
-        return;
-     }
-
-     //Empty slot
-     to.SetItem(from.GetItem(), from.GetAmount());
-     from.ClearSlot();
-   }
-
-   private void UpdateDragItemPosition()
-   {
-    if(isDragging)
-    {
-        dragIcon.transform.position = Input.mousePosition;
+        from.ClearSlot();
     }
-   }
 
-   
+    private void UpdateDragItemPosition()
+    {
+        if (isDragging && Mouse.current != null && dragIcon != null)
+        {
+            RectTransform canvasRect = dragIcon.canvas.GetComponent<RectTransform>();
+            Vector2 localPoint;
+
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                canvasRect, 
+                Mouse.current.position.ReadValue(), 
+                dragIcon.canvas.worldCamera, 
+                out localPoint))
+            {
+                dragIcon.rectTransform.anchoredPosition = localPoint;
+            }
+        }
+    }
 }
